@@ -50,13 +50,13 @@ The kernel's configurations is in [config.h](openmz/config.h). The PMP fields `p
 - `YIELD_TO` call - allowing zones to yield their remaining time slice to a specific zone.
 - An optional *temporal* isolation of zones by disabling `YIELD/WFI` calls, and immediate context switch for interrupts.
 - More advanced round-robin scheduling with more configurable zone order and time slices.
-- Compatibility with a secure bootloader, or build a new secure bootloader.
-- Add remote attestation.
+- Compatibility with a secure bootloader, or a new secure bootloader.
+- System call for supporting remote attestation.
 - RISC-V user-interrupt extension (N extension) compatibility.
 - Multicore support.
 - Supervisor support.
 - More memory-mapped I/O regions per zone.
-- Inter-processor communication (IPI) - allowing communication with a Linux companion on another core.
+- Inter-processor communication (IPI) - allowing communication with a Linux companion on a different core.
 
 *The above list is mostly sorted by priority.*
 ## Example zone implementation
