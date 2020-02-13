@@ -21,10 +21,13 @@ The kernel's configurations is in [config.h](openmz/config.h). The PMP fields `p
 /* ... */
 /* number of zone */
 #define N_ZONES 3 
+
 /* max trap code */
 #define N_TRAPS 12
+
 /* max interrupt code */
 #define N_INTERRUPTS 12
+
 /* time slice in timer cycles */
 #define QUANTUM (32768 / 100)
 
