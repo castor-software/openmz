@@ -1,1 +1,7 @@
-This project is under three different copyright licenses. HexFive's license (LICENSE.HEXFIVE) for the MultiZone API (libhexfive.h), GPLv2 (LICENSE.GPLv2) for the kernel and drivers, and MIT (LICENSE.MIT) for the kernel configuration. The owner of the copyright of the source files are on the top of each file.
+This project is under three different copyright licenses:
+
+ - HexFive's license (LICENSE.HEXFIVE) for the MultiZone API (libhexfive.h).
+ - GPLv2 (LICENSE.GPLv2) for the kernel and drivers. 
+ - MIT (LICENSE.MIT) for the kernel configuration. 
+
+The owner of the copyright of the source files are on the top of each file.
