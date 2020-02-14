@@ -10,6 +10,7 @@
 #define KERNEL_H
 
 #include <timer.h>
+
 #include "config.h"
 #include "const.h"
 #include "csr.h"
@@ -36,8 +37,7 @@ typedef struct zone {
     u64 pmpcfg0;
     uptr pmpaddr[8];
     /* trap handling */
-    /* ustatus[0] = interrupt enabled, ustatus[1] = previous interrupt enabled
-     */
+    /* ustatus[0] = interrupt enabled, ustatus[4] = prev. interrupt enabled */
     uptr ustatus;
     uptr uie;
     uptr utval;

@@ -19,18 +19,20 @@ static void HandleIrq(void)
     /* save the current zone */
     KERNEL(next) = KERNEL(current);
     KERNEL(next_quantum) = read_mtimecmp() - read_mtime();
-    /* load the interrupting zone */
+    /* find the interrupting zone, and set it to current */
     uptr exception_code = KERNEL(mcause) & 0xFFF;
-    IrqHandler *irq_handler = &KERNEL(irq_handlers)[exception_code];
+    IrqHandler* irq_handler = &KERNEL(irq_handlers)[exception_code];
     KERNEL(current) = irq_handler->zone;
-    /* set the trap values */
-    CURRENT.ustatus <<= 1;
-    KERNEL(mie) &= CURRENT.uie;
+    /* disable zone's interrupts and save zone's interrupt enabled bit */
+    KERNEL(mie) &= ~CURRENT.uie;
+    CURRENT.ustatus <<= 4;
+    /* save the trap values */
     CURRENT.ucause = KERNEL(mcause);
     CURRENT.uepc = CURRENT.regs[PC];
     CURRENT.utval = KERNEL(mtval);
+    /* zone jump to handler */
     CURRENT.regs[PC] = irq_handler->handler;
-    /* */
+    /* kernel's interrupt mode is enabled */
     KERNEL(is_isr) = 1;
     write_mtimecmp(read_mtime() + QUANTUM);
 }
@@ -38,25 +40,27 @@ static void HandleIrq(void)
 static inline void HandleInterrupt(void)
 {
     switch (KERNEL(mcause) & 0xFFF) {
-        case MMODE_IPI:
-        case MMODE_TIMER:
-            /* timer is handled in HandleEvent */
-            break;
-        default:
-            HandleIrq();
+    case MMODE_IPI:
+    case MMODE_TIMER:
+        /* timer is handled in HandleEvent */
+        break;
+    default:
+        HandleIrq();
     }
 }
 
 static void HandleException(void)
 {
-    /* disable interrupts */
-    CURRENT.ustatus <<= 1;
-    KERNEL(mie) &= CURRENT.uie;
+    /* disable zone's interrupts and save zone's interrupt enabled bit */
+    KERNEL(mie) &= ~CURRENT.uie;
+    CURRENT.ustatus <<= 4;
     /* load handler and set trap values */
     uptr handler = CURRENT.trap_handlers[KERNEL(mcause)];
+    /* save the trap values */
     CURRENT.ucause = KERNEL(mcause);
     CURRENT.uepc = CURRENT.regs[PC];
     CURRENT.utval = KERNEL(mtval);
+    /* zone jumps to handler */
     CURRENT.regs[PC] = handler;
 }
 
@@ -68,7 +72,7 @@ static inline void HandleUret(void)
     CURRENT.uepc = 0;
     CURRENT.utval = 0;
     /* restore trap handling */
-    CURRENT.ustatus |= CURRENT.ustatus >> 1;
+    CURRENT.ustatus |= 0x1 & (CURRENT.ustatus >> 4);
     KERNEL(mie) |= CURRENT.uie * (CURRENT.ustatus & 1);
     /* if kernel is in interrupt mode,
      * load next zone and go to round robin mode */
@@ -124,14 +128,14 @@ static void HandleEcall(void)
 static inline void HandleTrap(void)
 {
     switch (KERNEL(mcause)) {
-        case UMODE_ECALL:
-            HandleEcall();
-            break;
-        case ILLEGAL_INSTRUCTION:
-            HandleIllegalInstruction();
-            break;
-        default:
-            HandleException();
+    case UMODE_ECALL:
+        HandleEcall();
+        break;
+    case ILLEGAL_INSTRUCTION:
+        HandleIllegalInstruction();
+        break;
+    default:
+        HandleException();
     }
 }
 
