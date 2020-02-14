@@ -46,6 +46,7 @@ The kernel's configurations is in [config.h](openmz/config.h). The PMP fields `p
 
 ## (Potential) Future Work
 - Complete formal verification - from the hardware level to source code.
+- Implement `ECALL_WFI`.
 - Asynchronous user-mode timer interrupts.
 - `YIELD_TO` call - allowing zones to yield their remaining time slice to a specific zone.
 - An optional *temporal* isolation of zones by disabling `YIELD/WFI` calls, and immediate context switch for interrupts.
@@ -56,7 +57,7 @@ The kernel's configurations is in [config.h](openmz/config.h). The PMP fields `p
 - Multicore support.
 - Supervisor support.
 - More memory-mapped I/O regions per zone.
-- Inter-processor communication (IPI) - allowing communication with a Linux companion on a different core.
+- Inter-processor communication (IPC) - allowing communication with a Linux companion on a different core.
 
 *The above list is mostly sorted by priority.*
 ## Example zone implementation
