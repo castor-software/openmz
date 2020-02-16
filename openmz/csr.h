@@ -8,43 +8,50 @@
  */
 #ifndef CSR_H
 #define CSR_H
+#include "types.h"
 
-#define write_csr(reg, val) __asm__ volatile("csrw " #reg ", %0" ::"rK"(val))
+#define CSRW(reg, in) __asm__ volatile("csrw " #reg ", %0" ::"r"(in))
+#define CSRR(out, reg) __asm__ volatile("csrr %0, " #reg \
+                                        : "=r"(out))
 
-#define read_csr(reg)                                     \
-    ({                                                    \
-        uptr __tmp;                                       \
-        __asm__ volatile("csrr %0, " #reg : "=r"(__tmp)); \
-        __tmp;                                            \
-    })
-
-#define swap_csr(reg, val)                                                   \
-    ({                                                                       \
-        uptr __tmp;                                                          \
-        __asm__ volatile("csrr %0, " #reg ", %1" : "=r"(__tmp) : "rK"(val)); \
-        __tmp;                                                               \
-    })
+#define MAKE_READ64(reg)                \
+    static inline u64 Read64##reg(void) \
+    {                                   \
+        uptr res;                       \
+        CSRR(res, reg);                 \
+        return res;                     \
+    }
 
 #ifdef RV32
-#define read_counter(reg)                         \
-    ({                                            \
-        register volatile u32 __lo, __hi1, __hi2; \
-        do {                                      \
-            __hi1 = read_csr(reg##h);             \
-            __lo = read_csr(reg);                 \
-            __hi2 = read_csr(reg##h);             \
-        } while (__hi1 != __hi2);                 \
-        ((u64)__hi1 << 32) | __lo;                \
-    })
-#define write_counter(reg, val)       \
-    ({                                \
-        write_csr(reg, 0);            \
-        write_csr(reg##h, val >> 32); \
-        write_csr(reg, val);          \
-    })
+#define MAKE_READ64_COUNTER(reg)            \
+    static inline u64 Read64##reg(void)     \
+    {                                       \
+        register volatile u32 lo, hi1, hi2; \
+        do {                                \
+            CSRR(hi1, reg##h);              \
+            CSRR(lo, reg);                  \
+            CSRR(hi2, reg##h);              \
+        } while (hi1 != hi2);               \
+        return ((u64)hi1 << 32) | lo;       \
+    }
 #else
-#define read_counter(reg) read_csr(reg)
-#define write_counter(reg, val) write_csr(reg, val)
+#define MAKE_READ64_COUNTER(reg)        \
+    static inline u64 Read64##reg(void) \
+    {                                   \
+        register volatile u64 res;      \
+        CSRR(res, reg);                 \
+        return res;                     \
+    }
 #endif
+
+MAKE_READ64(misa)
+MAKE_READ64(mvendorid)
+MAKE_READ64(marchid)
+MAKE_READ64(mimpid)
+MAKE_READ64(mhartid)
+MAKE_READ64_COUNTER(mcycle)
+MAKE_READ64_COUNTER(minstret)
+MAKE_READ64_COUNTER(mhpmcounter3)
+MAKE_READ64_COUNTER(mhpmcounter4)
 
 #endif /* CSR_H */

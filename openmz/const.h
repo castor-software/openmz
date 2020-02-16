@@ -12,7 +12,9 @@
 /* selection macro */
 #if __riscv_xlen == 32
 #define SEL(a, b) a
+#define RV32 1
 #else
+#define RV64 1
 #define SEL(a, b) b
 #endif
 
@@ -33,6 +35,7 @@
 #define T1 6
 #define T2 7
 #define FP 8
+#define S0 8
 #define S1 9
 #define A0 10
 #define A1 11
