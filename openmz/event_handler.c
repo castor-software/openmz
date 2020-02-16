@@ -14,11 +14,13 @@
 #define ILLEGAL_INSTRUCTION 2
 #define UMODE_ECALL 8
 
+typedef void (*Handler)(void);
+
 static void HandleIrq(void)
 {
     /* save the current zone */
     KERNEL(next) = KERNEL(current);
-    KERNEL(next_quantum) = read_mtimecmp() - read_mtime();
+    KERNEL(next_quantum) = ReadMtimecmp() - ReadMtime();
     /* find the interrupting zone, and set it to current */
     uptr exception_code = KERNEL(mcause) & 0xFFF;
     IrqHandler* irq_handler = &KERNEL(irq_handlers)[exception_code];
@@ -34,7 +36,7 @@ static void HandleIrq(void)
     CURRENT.regs[PC] = irq_handler->handler;
     /* kernel's interrupt mode is enabled */
     KERNEL(is_isr) = 1;
-    write_mtimecmp(read_mtime() + QUANTUM);
+    WriteMtimecmp(ReadMtime() + QUANTUM);
 }
 
 static inline void HandleInterrupt(void)
@@ -95,7 +97,6 @@ static void HandleIllegalInstruction(void)
 static void HandleEcall(void)
 {
     /* ecall table */
-    typedef void (*Handler)(void);
     static const Handler handlers[] = {
         [ECALL_YIELD] = EcallYield,
         [ECALL_WFI] = EcallWfi,
@@ -120,6 +121,8 @@ static void HandleEcall(void)
 
     /* always advance PC! */
     CURRENT.regs[PC] += 4;
+    CURRENT.regs[A0] = 0;
+    CURRENT.regs[A1] = 0;
     uptr ecall = CURRENT.regs[A7];
     if (ecall < ARRAY_LEN(handlers))
         handlers[ecall]();
@@ -147,11 +150,11 @@ void HandleEvent(void)
     else
         HandleTrap();
     /* check time out */
-    while (read_mtime() >= read_mtimecmp())
+    while (ReadMtime() >= ReadMtimecmp())
         LoadNextZone();
     /* check user mode timecmp */
     if ((CURRENT.ustatus & 1) && CURRENT.timecmp) {
-        if (CURRENT.timecmp <= read_mtime()) {
+        if (CURRENT.timecmp <= ReadMtime()) {
             CURRENT.timecmp = 0;
             KERNEL(mcause) = 3;
             KERNEL(mtval) = 0;

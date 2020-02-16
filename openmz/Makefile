@@ -9,22 +9,22 @@ TARGET ?= fe310
 
 BSP_DIR := bsp/$(TARGET)
 
-CC := riscv64-unknown-elf-gcc
+CC := ccomp
 OBJCOPY := riscv64-unknown-elf-objcopy
 
 
-include $(BSP_DIR)/settings.mk
-CFLAGS += -std=c99 -Og -Wall -mpreferred-stack-boundary=4 -I $(BSP_DIR)
-CFLAGS += -T $(BSP_DIR)/default.lds -nostartfiles -static
-CFLAGS += -Wl,-Map,openmz.map
+#include $(BSP_DIR)/settings.mk
+CFLAGS += -O2 -g -Wall -finline-asm -fno-fpu
+CFLAGS += -T $(BSP_DIR)/default.lds -nostdlib -static
+CFLAGS += -Wl,-Map,openmz.map 
 
 SOURCES = head.S traps.S event_handler.c kernel.c $(BSP_DIR)/entry.S
 
 .PHONY: all
 all: openmz.elf openmz.hex
 
-openmz.elf: $(SOURCES)
-	$(CC) $(CFLAGS) $(SOURCES) -o $@
+openmz.elf: $(wildcard *.S *.h *.c) $(BSP_DIR)/entry.S
+	$(CC) $(CFLAGS) -v $(SOURCES) -o $@
 
 openmz.hex: openmz.elf
 	$(OBJCOPY) -O ihex openmz.elf openmz.hex
