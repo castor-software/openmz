@@ -41,7 +41,6 @@ static void EcallWfi(void)
 static void EcallSend(void)
 {
     uptr receiver = CURRENT.regs[A0] - 1;
-    CURRENT.regs[A0] = 0;
     /* check bound */
     if (receiver >= N_ZONES)
         return;
@@ -63,7 +62,6 @@ static void EcallSend(void)
 static void EcallRecv(void)
 {
     uptr sender = CURRENT.regs[A0] - 1;
-    CURRENT.regs[A0] = 0;
     /* check bounds */
     if (sender >= N_ZONES)
         return;
@@ -139,50 +137,50 @@ static void EcallCsrwMtimecmp(void)
 
 static void EcallCsrrMtime(void)
 {
-    CAST64(CURRENT.regs[A0]) = read_mtime();
+    CAST64(CURRENT.regs[A0]) = ReadMtime();
 }
 
 static void EcallCsrrMcycle(void)
 {
-    CAST64(CURRENT.regs[A0]) = read_counter(mcycle);
+    CAST64(CURRENT.regs[A0]) = Read64mcycle();
 }
 
 static void EcallCsrrMinstr(void)
 {
-    CAST64(CURRENT.regs[A0]) = read_counter(minstret);
+    CAST64(CURRENT.regs[A0]) = Read64minstret();
 }
 
 static void EcallCsrrMhpmc3(void)
 {
-    CAST64(CURRENT.regs[A0]) = read_counter(mhpmcounter3);
+    CAST64(CURRENT.regs[A0]) = Read64mhpmcounter3();
 }
 
 static void EcallCsrrMhpmc4(void)
 {
-    CAST64(CURRENT.regs[A0]) = read_counter(mhpmcounter4);
+    CAST64(CURRENT.regs[A0]) = Read64mhpmcounter4();
 }
 
 static void EcallCsrrMisa(void)
 {
-    CAST64(CURRENT.regs[A0]) = read_csr(misa);
+    CAST64(CURRENT.regs[A0]) = Read64misa();
 }
 
 static void EcallCsrrMvendid(void)
 {
-    CAST64(CURRENT.regs[A0]) = read_csr(mvendorid);
+    CAST64(CURRENT.regs[A0]) = Read64mvendorid();
 }
 
 static void EcallCsrrMarchid(void)
 {
-    CAST64(CURRENT.regs[A0]) = read_csr(marchid);
+    CAST64(CURRENT.regs[A0]) = Read64marchid();
 }
 
 static void EcallCsrrMimpid(void)
 {
-    CAST64(CURRENT.regs[A0]) = read_csr(mimpid);
+    CAST64(CURRENT.regs[A0]) = Read64mimpid();
 }
 
 static void EcallCsrrMhartid(void)
 {
-    CAST64(CURRENT.regs[A0]) = read_csr(mhartid);
+    CAST64(CURRENT.regs[A0]) = Read64mhartid();
 }

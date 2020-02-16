@@ -9,11 +9,10 @@
 #ifndef KERNEL_H
 #define KERNEL_H
 
-#include <timer.h>
-
 #include "config.h"
 #include "const.h"
 #include "csr.h"
+#include "timer.h"
 #include "types.h"
 
 /* A message for one zone */
@@ -90,7 +89,7 @@ static inline void LoadNextZone(void)
 {
     /* let next zone be current zone and set timer */
     KERNEL(current) = KERNEL(next);
-    write_mtimecmp(read_mtime() + KERNEL(next_quantum));
+    WriteMtimecmp(ReadMtime() + KERNEL(next_quantum));
     /* set the next zone in round robin fashion */
     KERNEL(next) = KERNEL(current) + 1;
     if (KERNEL(next) == KERNEL(zones) + N_ZONES)
