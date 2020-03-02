@@ -8,12 +8,12 @@
  */
 OUTPUT_ARCH("riscv")
 
-ENTRY(_entry)
+ENTRY(_start)
 
 MEMORY
 {
-        flash (rxai!w) : ORIGIN = 0x20010000, LENGTH = 0x10000
-        ram (wxa!ri) : ORIGIN = 0x80000000 + 4K, LENGTH = 4K
+        flash (rxai!w) : ORIGIN = flash, LENGTH = 0x10000
+        ram (wxa!ri) : ORIGIN = ram + 4K, LENGTH = 4K
 }
 
 PHDRS
@@ -25,24 +25,26 @@ PHDRS
 
 SECTIONS
 {
+        __stack_size = DEFINED(__stack_size) ? __stack_size : 0x400;
+        PROVIDE(__stack_size = __stack_size);
         .text : {
                 KEEP (*(.text.init))
-                KEEP (*(.text.init.*))
+                KEEP (*(.text.trap))
                 *(.text)
                 *(.text.*)
                 . = ALIGN(4); 
         } >flash AT>flash :flash
 
-        PROVIDE(__text = ADDR(.text)); 
-        PROVIDE (__etext = ADDR(.text) + SIZEOF(.text)); 
+        PROVIDE(_text_start = ADDR(.text)); 
+        PROVIDE (_text_end = ADDR(.text) + SIZEOF(.text)); 
   
-        .rodata : ALIGN(4) {
+        .rodata : ALIGN(8) {
                 *(.rdata)
                 *(.rodata)
                 *(.rodata.*)
         } >flash AT>flash :flash
 
-        .data : ALIGN(4) {
+        .data : ALIGN(8) {
                 *(.data)
                 *(.data.*)
                 . = ALIGN(4); 
@@ -52,11 +54,11 @@ SECTIONS
                 . = ALIGN(4); 
         } >ram AT>flash :ram_init
 
-        PROVIDE(_data_lma = LOADADDR(.data)); 
-        PROVIDE(_data = ADDR(.data)); 
-        PROVIDE(_edata = ADDR(.data) + SIZEOF(.data)); 
+        PROVIDE(_data_src_start = LOADADDR(.data)); 
+        PROVIDE(_data_dst_start = ADDR(.data)); 
+        PROVIDE(_data_dst_end = ADDR(.data) + SIZEOF(.data)); 
 
-        .bss : ALIGN(4) {
+        .bss : ALIGN(8) {
                 *(.bss)
                 *(.bss.*)
                 *(.sbss*)
@@ -64,6 +66,13 @@ SECTIONS
                 . = ALIGN(8); 
         } >ram AT>ram :ram
 
-        PROVIDE(_bss = ADDR(.bss)); 
-        PROVIDE(_ebss = ADDR(.bss) + SIZEOF(.bss)); 
+        PROVIDE(_bss_start = ADDR(.bss)); 
+        PROVIDE(_bss_end = ADDR(.bss) + SIZEOF(.bss)); 
+
+        .stack : {
+            PROVIDE(kernel_stack_start = .);
+            . += __stack_size;
+            PROVIDE(_sp = .);
+            PROVIDE(kernel_stack_end = .);
+        } >ram AT>ram :ram
 }

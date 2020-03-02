@@ -60,7 +60,7 @@ AsmTrapVector:
         .option norelax
         la      gp, __global_pointer$
         .option pop
-        la      sp, kernel_stack
+        la      sp, _sp
 
         call    KernelEntry
         call    HandleEvent
@@ -111,8 +111,3 @@ __hang:
         ebreak
         j       __hang
 
-.section .bss
-.globl kernel_stack
-kernel_stack_end:
-.space	2048
-kernel_stack:
