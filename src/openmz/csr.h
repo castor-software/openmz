@@ -14,44 +14,26 @@
 #define CSRR(out, reg) __asm__ volatile("csrr %0, " #reg \
                                         : "=r"(out))
 
-#define MAKE_READ64(reg)                \
-    static inline u64 Read64##reg(void) \
-    {                                   \
-        uptr res;                       \
-        CSRR(res, reg);                 \
-        return res;                     \
-    }
-
 #ifdef RV32
-#define MAKE_READ64_COUNTER(reg)            \
-    static inline u64 Read64##reg(void)     \
-    {                                       \
-        register volatile u32 lo, hi1, hi2; \
-        do {                                \
-            CSRR(hi1, reg##h);              \
-            CSRR(lo, reg);                  \
-            CSRR(hi2, reg##h);              \
-        } while (hi1 != hi2);               \
-        return ((u64)hi1 << 32) | lo;       \
-    }
+/* x5 = t0, x6 = t1, x7 = x2 */
+#define CSRR64(out, reg)                            \
+    __asm__(                                        \
+        "csrr   x5, " #reg ";"                      \
+        "sw     x5, 0(%[outp]);"                    \
+        "sw     x0, 4(%[outp]);" ::[outp] "r"(&out) \
+        : "x5");
+#define CSRR_COUNTER(out, reg)                       \
+    __asm__(                                         \
+        "1: csrr x5, " #reg "h;"                     \
+        "   csrr x6, " #reg ";"                      \
+        "   csrr x7, " #reg "h;"                     \
+        "   bne  x5, x7, 1b;"                        \
+        "   sw   x6, 0(%[outp]);"                    \
+        "   sw   x5, 4(%[outp]);" ::[outp] "r"(&out) \
+        : "x5", "x6", "x7");
 #else
-#define MAKE_READ64_COUNTER(reg)        \
-    static inline u64 Read64##reg(void) \
-    {                                   \
-        register volatile u64 res;      \
-        CSRR(res, reg);                 \
-        return res;                     \
-    }
+#define CSRR64(out, reg) CSRR(out, reg)
+#define CSR_COUNTER(out, reg) CSRR(out, reg)
 #endif
-
-MAKE_READ64(misa)
-MAKE_READ64(mvendorid)
-MAKE_READ64(marchid)
-MAKE_READ64(mimpid)
-MAKE_READ64(mhartid)
-MAKE_READ64_COUNTER(mcycle)
-MAKE_READ64_COUNTER(minstret)
-MAKE_READ64_COUNTER(mhpmcounter3)
-MAKE_READ64_COUNTER(mhpmcounter4)
 
 #endif /* CSR_H */

@@ -5,23 +5,30 @@
 # Note that NO WARRANTY is provided.
 # See "LICENSE.GPLv2" for details.
 
-COMPILER ?= gcc
+PROGRAM = openmz.elf
 TARGET ?= fe310
 
-SOURCES = traps.S event_handler.c kernel.c crt0.S
+SOURCES = traps.S event_handler.c kernel.c head.S
 
 BSP_DIR := ../bsp/$(TARGET)
 SIZE = riscv64-unknown-elf-size
 
 # include compiler specific flags
-include $(COMPILER).mk
-CFLAGS += -T $(BSP_DIR)/memory.lds -T default.lds -nostdlib -static
+ifeq ($(CC), riscv64-unknown-elf-gcc)
+    CFLAGS += -std=c99 -O2 -g -Wall -mabi=ilp32 -march=rv32imac
+else ifeq ($(CC), ccomp)
+    CFLAGS += -O2 -g -Wall -finline-asm -fno-fpu
+endif
 
-.PHONY: openmz.elf
-openmz.elf: $(wildcard *.S *.h *.c)
-	$(CC) $(CFLAGS) -v $(SOURCES) -o openmz.elf
-	$(SIZE) openmz.elf
+
+CFLAGS += -T $(BSP_DIR)/memory.lds -T default.lds -nostdlib
+
+all: $(PROGRAM)
+.PHONY: $(PROGRAM)
+$(PROGRAM): $(wildcard *.S *.h *.c)
+	$(CC) $(CFLAGS) $(SOURCES) -o $(PROGRAM)
+	$(SIZE) $(PROGRAM)
 
 .PHONY: clean
 clean:
-	rm openmz.elf
+	rm -f $(PROGRAM)

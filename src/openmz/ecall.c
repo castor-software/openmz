@@ -142,45 +142,45 @@ static void EcallCsrrMtime(void)
 
 static void EcallCsrrMcycle(void)
 {
-    CAST64(CURRENT.regs[A0]) = Read64mcycle();
+    CSRR_COUNTER(CURRENT.regs[A0], mcycle);
 }
 
 static void EcallCsrrMinstr(void)
 {
-    CAST64(CURRENT.regs[A0]) = Read64minstret();
+    CSRR_COUNTER(CURRENT.regs[A0], minstret);
 }
 
 static void EcallCsrrMhpmc3(void)
 {
-    CAST64(CURRENT.regs[A0]) = Read64mhpmcounter3();
+    CSRR_COUNTER(CURRENT.regs[A0], mhpmcounter3);
 }
 
 static void EcallCsrrMhpmc4(void)
 {
-    CAST64(CURRENT.regs[A0]) = Read64mhpmcounter4();
+    CSRR_COUNTER(CURRENT.regs[A0], mhpmcounter4);
 }
 
 static void EcallCsrrMisa(void)
 {
-    CAST64(CURRENT.regs[A0]) = Read64misa();
+    CSRR64(CURRENT.regs[A0], misa);
 }
 
 static void EcallCsrrMvendid(void)
 {
-    CAST64(CURRENT.regs[A0]) = Read64mvendorid();
+    CSRR64(CURRENT.regs[A0], mvendorid);
 }
 
 static void EcallCsrrMarchid(void)
 {
-    CAST64(CURRENT.regs[A0]) = Read64marchid();
+    CSRR64(CURRENT.regs[A0], marchid);
 }
 
 static void EcallCsrrMimpid(void)
 {
-    CAST64(CURRENT.regs[A0]) = Read64mimpid();
+    CSRR64(CURRENT.regs[A0], mimpid);
 }
 
 static void EcallCsrrMhartid(void)
 {
-    CAST64(CURRENT.regs[A0]) = Read64mhartid();
+    CSRR64(CURRENT.regs[A0], mhartid);
 }

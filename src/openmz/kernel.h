@@ -12,6 +12,7 @@
 #include "config.h"
 #include "const.h"
 #include "csr.h"
+#include "reg_index.h"
 #include "timer.h"
 #include "types.h"
 

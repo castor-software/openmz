@@ -42,11 +42,11 @@ ENTRY(_start)
 
 /* start the kernel */
     csrwi   mscratch, 0     /* mscratch == 0 means kernel mode */
-    la      t0, __hang      /* set hang as default trap vector */ 
+    la      t0, _hang      /* set hang as default trap vector */ 
     csrw    mtvec, t0       
     call    KernelInit      /* call the kernel entry function */
 
 /* default trap vector, we reach this only if error in kernel */
-__hang:
+ENTRY(_hang)
     ebreak
-    j       __hang
+    j       _hang

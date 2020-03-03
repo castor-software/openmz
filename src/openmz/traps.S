@@ -7,6 +7,7 @@
  * See "LICENSE.GPLv2" for details.
  */
 #include "asm.h"
+#include "reg_index.h"
 
 .extern kernel_stack
 .extern __global_pointer$
@@ -19,7 +20,7 @@
 AsmTrapVector:
         /* load trap_frame pointer */
         csrrw   a0, mscratch, a0
-        beqz    a0, __hang
+        beqz    a0, _hang
         /* save gpr */
         REG_S   ra,  (XBYTES * RA)(a0)
         REG_S   sp,  (XBYTES * SP)(a0)
@@ -106,8 +107,3 @@ AsmLoadContext:
         REG_L   a0,  (XBYTES * A0)(a0)
         fence
         mret                    
-
-__hang:
-        ebreak
-        j       __hang
-
