@@ -5,24 +5,24 @@
 # Note that NO WARRANTY is provided.
 # See "LICENSE.GPLv2" for details.
 
-PROGRAM = openmz
+PROGRAM = zone2
 ELF = $(PROGRAM).elf
 HEX = $(PROGRAM).hex
-SOURCES = head.S traps.S ecall.c illegal_instruction.c kernel.c scheduler.c traps.c user_timer.c user_trap.c 
+SOURCES = main.c head.S
 
 BSP_DIR := ../bsp/$(TARGET)
 SIZE = riscv64-unknown-elf-size
 OBJCOPY = riscv64-unknown-elf-objcopy
 
-# include compiler specific flags
-ifeq ($(CC), riscv64-unknown-elf-gcc) # GCC
-    CFLAGS += -std=c99 -Og -g -Wall -mabi=ilp32 -march=rv32imac
-else ifeq ($(CC), ccomp) # CompCert
-    CFLAGS += -O -g -Wall -finline-asm -fno-fpu
+# add flags
+ifeq ($(CC), riscv64-unknown-elf-gcc)
+    CFLAGS += -std=c99 -O2 -mabi=ilp32 -march=rv32imac
+else ifeq ($(CC), ccomp)
+    CFLAGS += -O2 -Wall -finline-asm -fno-fpu
 endif
 
-# load the memory layout from the BSP (memory.lds), and the linker script (default.lds).
-CFLAGS += -T $(BSP_DIR)/memory.lds -T default.lds -nostdlib -mcmodel=medlow
+
+CFLAGS += -T $(BSP_DIR)/memory.lds -T default.lds -nostdlib -static
 
 all: $(ELF) $(HEX)
 

@@ -8,33 +8,58 @@
  */
 #ifndef CONFIG_H
 #define CONFIG_H
+#include "config_macro.h"
 
-/* do not touch */
-#define ZONE(pc, cfg0, addr) { .regs[PC] = pc, .pmpcfg0 = cfg0, .pmpaddr = addr },
-#define IRQ(zone_id, irq_num) \
-    [irq_num] = { .zone = &kernel.zones[zone_id - 1], .handler = 0 },
-/**/
+// Number of zones
+#define N_ZONES 2
 
-/* this is our example configuration */
-/* memory-mapped addresses of mtime and mtimecmp */
-#define MTIME 0x200bff8
-#define MTIMECMP 0x2004000
-
-/* number of zones */
-#define N_ZONES 3
-/* max trap code */
+// max trap code + 1
 #define N_TRAPS 12
-/* max interrupt code */
+
+// max interrupt code + 1
 #define N_INTERRUPTS 12
-/* time slice in ticks */
+
+// time slice in ticks
 #define QUANTUM (32768 / 100)
 
-#define ZONE_CONFIG               \
-    ZONE(0x20020000, 0xf, { -1 }) \
-    ZONE(0x20030000, 0xf, { -1 }) \
-    ZONE(0x20040000, 0xf, { -1 })
+/*
+ * ZONE_N has N PMP regions. ZONE_N is defined for N = 2, 3, ..., 8.
+ * ZONE_N's first argument is the program counter, the following 
+ * arguments are the PMP configurations.
+ *
+ * Example:
+ * ZONE_2(0x20020000, NAPOT(RX, 0x20020000, 13), NAPOT(RW, 0x80001000, 12))
+ *      pc: 0x20020000
+ *      region 1: read/execute, Base address 0x20020000, size 2^13
+ *      region 2: read/execute, Base address 0x80001000, size 2^12
+ *
+ * PMP configurations are:
+ * - TOR(Permissions, address)
+ * - NA4(Permissions, base address)
+ * - NAPOT(Permissions, base address, log_2(size))
+ *      The base address should be 2^size aligned.
+ *      
+ * For all addresses, the two least significant bits will be zero since
+ * PMP has the minimum granularity of 4 bytes.
+ */
+#define ZONE_CONFIG                        \
+    {                                      \
+        ZONE_2(0x20020000,                 \
+            NAPOT(RX, 0x20020000, 13),     \
+            NAPOT(RW, 0x80001000, 12)),    \
+            ZONE_2(0x20030000,             \
+                NAPOT(RX, 0x20030000, 13), \
+                NAPOT(RW, 0x80002000, 12)) \
+    }
 
-#define IRQ_CONFIG IRQ(1, 11)
+/*
+ * Here we register hardware interrupts. 
+ * IRQ(Zone ID, Interrupt code)
+ */
+#define IRQ_CONFIG \
+    {              \
+        IRQ(1, 11) \
+    }
 /**/
 
 #endif /* CONFIG_H */

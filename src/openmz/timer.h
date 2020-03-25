@@ -1,67 +1,38 @@
-/**
- * Copyright 2020, Saab AB
- *
- * This software may be distributed and modified according to
- * the terms of the GNU General Public License version 2.
- * Note that NO WARRANTY is provided.
- * See "LICENSE.GPLv2" for details.
- */
-
 #ifndef TIMER_H
 #define TIMER_H
 #include "kernel.h"
 
-#define REG32(val) (*((volatile u32*)(val)))
-#define REG64(val) (*((volatile u64*)(val)))
-
-#if RV32
-static inline u64 ReadMtime(void)
-{
-    volatile register u32 lo, hi1, hi2;
-    do {
-        hi1 = REG32(MTIME + 4);
-        lo = REG32(MTIME);
-        hi2 = REG32(MTIME + 4);
-    } while (hi1 != hi2);
-    return (u64)hi1 << 32 | lo;
-}
-
-static inline void WriteMtime(u64 val)
-{
-    REG32(MTIME) = 0;
-    REG32(MTIME + 4) = 0;
-    REG32(MTIME) = 0;
-}
-
-static inline void WriteMtimecmp(u64 mtimecmp)
-{
-    REG32(MTIMECMP) = -1;
-    REG32(MTIMECMP + 4) = mtimecmp >> 32;
-    REG32(MTIMECMP) = mtimecmp;
-}
-
-static inline u64 ReadMtimecmp(void)
-{
-    return REG64(MTIMECMP);
-}
+// address of mtime and mtimecmp are defined in memory.lds
+#if REGBITS == 32
+extern volatile u32 mtime, mtimeh;
+extern volatile u32 mtimecmp, mtimecmph;
 #else
-static inline u64 ReadMtime(void)
-{
-    return REG64(MTIME);
-}
-static inline void WriteMtime(u64 val)
-{
-    REG64(MTIME) = val;
-}
-
-static inline void WriteMtimecmp(u64 mtimecmp)
-{
-    REG64(MTIMECMP) = mtimecmp;
-}
-
-static inline u64 ReadMtimecmp(void)
-{
-    return REG64(MTIMECMP);
-}
+extern volatile u64 mtime;
+extern volatile u64 mtimecmp;
 #endif
+
+static inline u64 GetTime(void)
+{
+#if REGBITS == 32
+    register u32 lo, hi;
+    do {
+        hi = mtimeh;
+        lo = mtime;
+    } while (hi != mtimeh);
+    return ((u64)hi << 32) | lo;
+#else
+    return mtime;
+#endif
+}
+
+static inline void SetDeadline(u64 deadline)
+{
+#if REGBITS == 32
+    mtimecmp = -1;
+    mtimecmph = (u32)(deadline >> 32);
+    mtimecmp = (u32)deadline;
+#else
+    mtimecmp = deadline;
+#endif
+}
 #endif /* TIMER_H */

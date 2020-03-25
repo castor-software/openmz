@@ -8,32 +8,31 @@
  */
 #ifndef CSR_H
 #define CSR_H
-#include "types.h"
 
-#define CSRW(reg, in) __asm__ volatile("csrw " #reg ", %0" ::"r"(in))
+#define CSRW(reg, in) __asm__ volatile("csrw " #reg ", %0" ::"r"(in) \
+                                       : "memory")
 #define CSRR(out, reg) __asm__ volatile("csrr %0, " #reg \
                                         : "=r"(out))
 
-#ifdef RV32
-/* x5 = t0, x6 = t1, x7 = x2 */
-#define CSRR64(out, reg)                            \
-    __asm__(                                        \
-        "csrr   x5, " #reg ";"                      \
-        "sw     x5, 0(%[outp]);"                    \
-        "sw     x0, 4(%[outp]);" ::[outp] "r"(&out) \
-        : "x5");
+#if __riscv_xlen == 32
+/* x5, x5, x7 = t0, t1, t2 */
+#define CSRR64(out, reg)                             \
+    __asm__ volatile("csrr   x5, " #reg ";"          \
+                     "sw     x5, 0(%0);"             \
+                     "sw     x0, 4(%0);" ::"r"(&out) \
+                     : "x5", "memory")
 #define CSRR_COUNTER(out, reg)                       \
-    __asm__(                                         \
-        "1: csrr x5, " #reg "h;"                     \
-        "   csrr x6, " #reg ";"                      \
-        "   csrr x7, " #reg "h;"                     \
-        "   bne  x5, x7, 1b;"                        \
-        "   sw   x6, 0(%[outp]);"                    \
-        "   sw   x5, 4(%[outp]);" ::[outp] "r"(&out) \
-        : "x5", "x6", "x7");
+    __asm__ volatile("  csrr x5, " #reg "h;"         \
+                     "  csrr x6, " #reg ";"          \
+                     "  csrr x7, " #reg "h;"         \
+                     "  beq  x5, x7, 1f;"            \
+                     "  csrr x6, " #reg ";"          \
+                     "1:sw   x6, 0(%0);"             \
+                     "  sw   x7, 4(%0);" ::"r"(&out) \
+                     : "x5", "x6", "x7", "memory")
 #else
 #define CSRR64(out, reg) CSRR(out, reg)
-#define CSR_COUNTER(out, reg) CSRR(out, reg)
+#define CSRR_COUNTER(out, reg) CSRR(out, reg)
 #endif
 
 #endif /* CSR_H */

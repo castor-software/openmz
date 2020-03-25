@@ -8,3 +8,7 @@
  */
 flash = 0x20010000;
 ram  = 0x80000000;
+mtime = 0x200bff8;
+mtimecmp = 0x2004000;
+mtimeh = mtime + 4;
+mtimecmph = mtimecmp + 4;

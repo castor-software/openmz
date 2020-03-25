@@ -6,6 +6,10 @@
  * Note that NO WARRANTY is provided.
  * See "LICENSE.GPLv2" for details.
  */
+
+#include "ecall.h"
+#include "timer.h"
+
 /* ECALL numbers */
 #define ECALL_YIELD 0
 #define ECALL_WFI 1
@@ -27,160 +31,169 @@
 #define ECALL_CSRR_MIMPID 17
 #define ECALL_CSRR_MHARTID 18
 
-static void EcallYield(void)
+/* handler takes a caller and its argument registers a0-a7 */
+typedef void (*Handler)(Zone* caller, uptr args[8]);
+
+static void EcallYield(Zone UNUSED(*caller), uptr UNUSED(args[8]))
 {
-    LoadNextZone();
+    HART.event = EVENT_YIELD;
 }
 
-static void EcallWfi(void)
+static void EcallWfi(Zone* UNUSED(caller), uptr UNUSED(args[8]))
 {
-    /* we have not implemented WFI, do a yield instead */
-    LoadNextZone();
+    HART.event = EVENT_WFI;
 }
 
-static void EcallSend(void)
+static void EcallSend(Zone* caller, uptr args[8])
 {
-    uptr receiver = CURRENT.regs[A0] - 1;
-    /* check bound */
+    uptr receiver = args[0] - 1;
+    args[0] = 0;
     if (receiver >= N_ZONES)
         return;
-    /* check if inbox is full */
-    Inbox* inbox = ZONES[receiver].inboxes + (CURRENT.id - 1);
+    Inbox* inbox = &INBOXES[receiver][caller->id - 1];
     if (inbox->full)
         return;
-    /* if empty, put message */
-    inbox->msgs[0] = CURRENT.regs[A1];
-    inbox->msgs[1] = CURRENT.regs[A2];
-#ifdef RV32
-    inbox->msgs[2] = CURRENT.regs[A3];
-    inbox->msgs[3] = CURRENT.regs[A4];
-#endif
-    /* inbox is now full */
-    CURRENT.regs[A0] = 1;
+    for (int i = 0; i < N_MSGS; ++i)
+        inbox->msgs[i] = args[1 + i];
+    args[0] = 1;
 }
 
-static void EcallRecv(void)
+static void EcallRecv(Zone* caller, uptr args[8])
 {
-    uptr sender = CURRENT.regs[A0] - 1;
-    /* check bounds */
+    uptr sender = args[0] - 1;
+    args[0] = 0;
     if (sender >= N_ZONES)
         return;
-    /* check if inbox is full */
-    Inbox* inbox = CURRENT.inboxes + sender;
+    Inbox* inbox = &INBOXES[caller->id - 1][sender];
     if (!inbox->full)
         return;
-    /* if full, get message */
-    CURRENT.regs[A1] = inbox->msgs[0];
-    CURRENT.regs[A2] = inbox->msgs[1];
-#ifdef RV32
-    CURRENT.regs[A3] = inbox->msgs[2];
-    CURRENT.regs[A4] = inbox->msgs[3];
-#endif
-    /* inbox is now empty */
-    CURRENT.regs[A0] = 0;
+    for (int i = 0; i < N_MSGS; ++i)
+        args[i + 1] = inbox->msgs[i];
+    args[0] = 1;
 }
 
-static void EcallTrpVect(void)
+static void EcallTrpVect(Zone* caller, uptr args[8])
 {
-    uptr trap_num = CURRENT.regs[A0];
-    uptr handler = CURRENT.regs[A1];
-    if (trap_num >= N_TRAPS)
+    uptr code = args[0];
+    uptr handler = args[1];
+    if (code >= N_TRAPS)
         return;
-    CURRENT.trap_handlers[trap_num] = handler;
-    /* if it is mtimecmp emulation, reset timecmp */
-    if (trap_num == 3)
-        CURRENT.timecmp = 0;
+    caller->trap_handlers[code] = handler;
 }
 
-static void EcallIrqVect(void)
+static void EcallIrqVect(Zone* caller, uptr args[8])
 {
-    uptr irq_num = CURRENT.regs[A0];
-    uptr handler = CURRENT.regs[A1];
-    /* check bounds */
-    if (irq_num >= N_INTERRUPTS)
+    uptr code = args[0];
+    uptr handler = args[1];
+    if ((code >= N_INTERRUPTS) || (IRQ_HANDLERS[code].zone != caller))
         return;
-    /* check irq->zone mapping */
-    IrqHandler* irq_handler = &KERNEL(irq_handlers)[irq_num];
-    if (irq_handler->zone != &CURRENT)
-        return;
-    /* if it is the correct zone, put the handler */
-    irq_handler->handler = handler;
-    /* check if we should activate or deactivate interrupt */
-    if (handler) {
-        /* if the handler is non-zero */
-        /* activate the interrupt */
-        CURRENT.uie |= (1 << irq_num);
-        KERNEL(mie) |= CURRENT.uie * (CURRENT.ustatus & 1);
-    } else {
-        /* handler == 0 ==> deactivate the interrupt */
-        CURRENT.uie &= ~(1 << irq_num);
-        KERNEL(mie) &= ~CURRENT.uie;
+    IRQ_HANDLERS[code].handler = handler;
+    if (handler)
+        caller->uie |= (1 << code);
+    else
+        caller->uie &= ~(1 << code);
+}
+
+static void EcallCsrsMie(Zone* caller, uptr UNUSED(args[8]))
+{
+    caller->ustatus |= USTATUS_IE;
+}
+
+static void EcallCsrcMie(Zone* caller, uptr UNUSED(args[8]))
+{
+    caller->ustatus &= ~USTATUS_IE;
+}
+
+static void EcallCsrwMtimecmp(Zone* caller, uptr args[8])
+{
+    caller->deadline = *((u64*)args);
+    if ((caller->ustatus & USTATUS_IE)
+        && caller->deadline && (caller->deadline < HART.deadline)) {
+        // zone interrupts are enabled
+        // and deadline is in current timeslice
+        SetDeadline(caller->deadline);
     }
 }
 
-static void EcallCsrsMie(void)
+static void EcallCsrrMtime(Zone* UNUSED(caller), uptr args[8])
 {
-    CURRENT.ustatus |= 1;
-    KERNEL(mie) |= CURRENT.uie;
+    *((u64*)args) = GetTime();
 }
 
-static void EcallCsrcMie(void)
+static void EcallCsrrMcycle(Zone* UNUSED(caller), uptr args[8])
 {
-    CURRENT.ustatus &= ~1;
-    KERNEL(mie) &= ~CURRENT.uie;
+    CSRR_COUNTER(args[0], mcycle);
 }
 
-static void EcallCsrwMtimecmp(void)
+static void EcallCsrrMinstr(Zone* UNUSED(caller), uptr args[8])
 {
-    CURRENT.timecmp = CAST64(CURRENT.regs[A0]);
+    CSRR_COUNTER(args[0], minstret);
 }
 
-static void EcallCsrrMtime(void)
+static void EcallCsrrMhpmc3(Zone* UNUSED(caller), uptr args[8])
 {
-    CAST64(CURRENT.regs[A0]) = ReadMtime();
+    CSRR_COUNTER(args[0], mhpmcounter3);
 }
 
-static void EcallCsrrMcycle(void)
+static void EcallCsrrMhpmc4(Zone* UNUSED(caller), uptr args[8])
 {
-    CSRR_COUNTER(CURRENT.regs[A0], mcycle);
+    CSRR_COUNTER(args[0], mhpmcounter4);
 }
 
-static void EcallCsrrMinstr(void)
+static void EcallCsrrMisa(Zone* UNUSED(caller), uptr args[8])
 {
-    CSRR_COUNTER(CURRENT.regs[A0], minstret);
+    CSRR64(args[0], misa);
 }
 
-static void EcallCsrrMhpmc3(void)
+static void EcallCsrrMvendid(Zone* UNUSED(caller), uptr args[8])
 {
-    CSRR_COUNTER(CURRENT.regs[A0], mhpmcounter3);
+    CSRR64(args[0], mvendorid);
 }
 
-static void EcallCsrrMhpmc4(void)
+static void EcallCsrrMarchid(Zone* UNUSED(caller), uptr args[8])
 {
-    CSRR_COUNTER(CURRENT.regs[A0], mhpmcounter4);
+    CSRR64(args[0], marchid);
 }
 
-static void EcallCsrrMisa(void)
+static void EcallCsrrMimpid(Zone* UNUSED(caller), uptr args[8])
 {
-    CSRR64(CURRENT.regs[A0], misa);
+    CSRR64(args[0], mimpid);
 }
 
-static void EcallCsrrMvendid(void)
+static void EcallCsrrMhartid(Zone* UNUSED(caller), uptr args[8])
 {
-    CSRR64(CURRENT.regs[A0], mvendorid);
+    CSRR64(args[0], mhartid);
 }
 
-static void EcallCsrrMarchid(void)
+void HandleEcall(void)
 {
-    CSRR64(CURRENT.regs[A0], marchid);
-}
+    /* ecall table */
+    static const Handler handlers[] = {
+        [ECALL_YIELD] = EcallYield,
+        [ECALL_WFI] = EcallWfi,
+        [ECALL_SEND] = EcallSend,
+        [ECALL_RECV] = EcallRecv,
+        [ECALL_TRP_VECT] = EcallTrpVect,
+        [ECALL_IRQ_VECT] = EcallIrqVect,
+        [ECALL_CSRS_MIE] = EcallCsrsMie,
+        [ECALL_CSRC_MIE] = EcallCsrcMie,
+        [ECALL_CSRW_MTIMECMP] = EcallCsrwMtimecmp,
+        [ECALL_CSRR_MTIME] = EcallCsrrMtime,
+        [ECALL_CSRR_MCYCLE] = EcallCsrrMcycle,
+        [ECALL_CSRR_MINSTR] = EcallCsrrMinstr,
+        [ECALL_CSRR_MHPMC3] = EcallCsrrMhpmc3,
+        [ECALL_CSRR_MHPMC4] = EcallCsrrMhpmc4,
+        [ECALL_CSRR_MISA] = EcallCsrrMisa,
+        [ECALL_CSRR_MVENDID] = EcallCsrrMvendid,
+        [ECALL_CSRR_MARCHID] = EcallCsrrMarchid,
+        [ECALL_CSRR_MIMPID] = EcallCsrrMimpid,
+        [ECALL_CSRR_MHARTID] = EcallCsrrMhartid,
+    };
 
-static void EcallCsrrMimpid(void)
-{
-    CSRR64(CURRENT.regs[A0], mimpid);
-}
-
-static void EcallCsrrMhartid(void)
-{
-    CSRR64(CURRENT.regs[A0], mhartid);
+    Zone* caller = &CURRENT;
+    /* always advance PC! */
+    caller->regs[PC] += 4;
+    uptr ecall = caller->regs[A7];
+    if (ecall < ARRAY_LEN(handlers))
+        handlers[ecall](caller, caller->regs + A0);
 }

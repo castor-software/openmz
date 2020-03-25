@@ -11,8 +11,8 @@
 
 /* selection macro */
 #if __riscv_xlen == 32
-#define SEL(a, b) a
 #define RV32 1
+#define SEL(a, b) a
 #else
 #define RV64 1
 #define SEL(a, b) b
@@ -21,7 +21,4 @@
 #define XLEN SEL(32, 64)
 #define XBYTES SEL(4, 8)
 
-#define CAST64(x) (*((u64*)(&x)))
-
-#define ARRAY_LEN(x) (sizeof(x) / sizeof(x[0]))
 #endif /* CONST_H */

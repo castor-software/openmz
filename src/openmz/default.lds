@@ -12,8 +12,8 @@ ENTRY(_start)
 
 MEMORY
 {
-        flash (rxai!w) : ORIGIN = flash, LENGTH = 0x2000
-        ram (wxa!ri) : ORIGIN = ram, LENGTH = 4K
+        flash (rxai!w) : ORIGIN = flash, LENGTH = 0x10000
+        ram (wxa!ri) : ORIGIN = ram, LENGTH = 0x10000 
 }
 
 PHDRS
@@ -29,50 +29,23 @@ SECTIONS
         PROVIDE(__stack_size = __stack_size);
         .text : {
                 KEEP (*(.text.init))
-                KEEP (*(.text.trap))
                 *(.text)
                 *(.text.*)
-                . = ALIGN(4); 
-        } >flash AT>flash :flash
-
-        PROVIDE(_text_start = ADDR(.text)); 
-        PROVIDE (_text_end = ADDR(.text) + SIZEOF(.text)); 
-  
-        .rodata : ALIGN(8) {
-                *(.rdata)
-                *(.rodata)
-                *(.rodata.*)
+                . = ALIGN(8); 
         } >flash AT>flash :flash
 
         .data : ALIGN(8) {
+                PROVIDE(__global_pointer$ = . + 0x800); 
                 *(.data)
                 *(.data.*)
-                . = ALIGN(4); 
-                PROVIDE(__global_pointer$ = . + 0x800); 
-                *(.sdata)
-                *(.sdata.*)
-                . = ALIGN(4); 
         } >ram AT>flash :ram_init
 
         PROVIDE(_data_src_start = LOADADDR(.data)); 
         PROVIDE(_data_dst_start = ADDR(.data)); 
         PROVIDE(_data_dst_end = ADDR(.data) + SIZEOF(.data)); 
 
-        .bss : ALIGN(8) {
-                *(.bss)
-                *(.bss.*)
-                *(.sbss*)
-                *(COMMON)
-                . = ALIGN(8); 
-        } >ram AT>ram :ram
-
-        PROVIDE(_bss_start = ADDR(.bss)); 
-        PROVIDE(_bss_end = ADDR(.bss) + SIZEOF(.bss)); 
-
-        .stack : {
-            PROVIDE(kernel_stack_start = .);
+        .stack : ALIGN(8) {
             . += __stack_size;
-            PROVIDE(_sp = .);
-            PROVIDE(kernel_stack_end = .);
+            PROVIDE( _sp = .);
         } >ram AT>ram :ram
 }

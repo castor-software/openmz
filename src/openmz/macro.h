@@ -6,9 +6,34 @@
  * Note that NO WARRANTY is provided.
  * See "LICENSE.GPLv2" for details.
  */
-#ifndef REG_INDEX_H
-#define REG_INDEX_H
-/* Register index */
+#ifndef CONST_H
+#define CONST_H
+
+// XLEN is the length of a register in bits
+#define REGBITS __riscv_xlen
+// XBYTES is length of register in bytes
+#define REGBYTES (__riscv_xlen / 8)
+
+#define RV32 (__riscv_xlen == 32)
+#define RV64 (__riscv_xlen == 64)
+
+/* selection macro */
+#if RV32
+#define SEL(a, b) a
+#else
+#define SEL(a, b) b
+#endif
+
+#define ARRAY_LEN(x) (sizeof(x) / sizeof(x[0]))
+#define UNUSED(x) x __attribute__((unused))
+
+#define XSTR(s) STR(s)
+#define STR(s) #s
+
+#define REG_S SEL(sw, sd) // register store
+#define REG_L SEL(lw, ld) // register load
+
+// Register index
 #define PC 0
 #define RA 1
 #define SP 2
@@ -42,5 +67,4 @@
 #define T4 29
 #define T5 30
 #define T6 31
-
-#endif /* REG_INDEX_H */
+#endif /* CONST_H */

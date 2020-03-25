@@ -11,12 +11,6 @@
 .globl x; \
 x:
 
-#if __riscv_xlen == 32
-#define RV32 1
-#else
-#define RV64 1
-#endif
-
 .section .text.libhexfive
 ENTRY(ECALL_YIELD)
         li      a7, 0           # sys call #0
@@ -29,7 +23,7 @@ ENTRY(ECALL_WFI)
         ret
 
 ENTRY(ECALL_SEND)
-#if RV32 
+#if __riscv_xlen == 32 
         lw      a4, 12(a1)      # load msg[3]
         lw      a3, 8(a1)       # load msg[2]
         lw      a2, 4(a1)       # load msg[1]
@@ -47,7 +41,7 @@ ENTRY(ECALL_RECV)
         li      a7, 3           # sys call #3
         ecall
         beqz    a0, 1f          # status == 0, go to ret
-#if RV32 
+#if __riscv_xlen == 32 
         sw      a4, 12(a6)      # save msg[3]
         sw      a3, 8(a6)       # save msg[2]
         sw      a2, 4(a6)       # save msg[1]

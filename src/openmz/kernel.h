@@ -4,53 +4,64 @@
  * This software may be distributed and modified according to
  * the terms of the GNU General Public License version 2.
  * Note that NO WARRANTY is provided.
- * See "LICENSE.GPLv2" for details.
- */
+ * See "LICENSE.GPLv2" for details.  */
 #ifndef KERNEL_H
 #define KERNEL_H
 
 #include "config.h"
-#include "const.h"
 #include "csr.h"
-#include "reg_index.h"
-#include "timer.h"
-#include "types.h"
+#include "macro.h"
 
-/* A message for one zone */
+#define EVENT_YIELD 1
+#define EVENT_WFI 2
+#define EVENT_URET 3
+#define EVENT_INTERRUPT 4
+
+#define USTATUS_IE 1
+#define USTATUS_PIE (1 << 4)
+
+typedef unsigned int u32;
+typedef unsigned long long u64;
+typedef unsigned long uptr;
+typedef signed int s32;
+typedef signed long long s64;
+typedef signed long sptr;
+
+/* Inbox for inter-zone communication. */
 typedef struct inbox {
-    /* if full != 0, then we have a message, else no message. */
+    // if full != 0, then we have a message, else no message.
     uptr full;
-    /*
-     * uptr is 32-64 bits depending on arch
-     * If uptr has 32-bits, set msgs length to 4 otherwise 2.
-     * This ensures that we have 128-bit messages at all time.
-     */
-    uptr msgs[SEL(4, 2)];
+    // uptr is 32-64 bits depending on for RV32 and RV64 resp.
+    // If uptr has 32-bits, we set msgs length to 4 otherwise 2.
+    // This ensures that we have 128-bit messages at all time.
+#define N_MSGS (128 / REGBITS)
+    uptr msgs[N_MSGS];
 } Inbox;
 
-/* all information we need about a zone */
+/* Zone data, e.g. Processor Control Block (PCB) */
 typedef struct zone {
     uptr id;
-    /* gpr + pc */
+    // zone context, pc + x1-x31
     uptr regs[32];
-    /* pmp configuration */
-    u64 pmpcfg0;
+    // pmp configuration registers
+    u32 pmpcfg0;
+    u32 pmpcfg1;
     uptr pmpaddr[8];
-    /* trap handling */
-    /* ustatus[0] = interrupt enabled, ustatus[4] = prev. interrupt enabled */
+    // trap handling regusters
+    // ustatus[0] = interrupt enabled
+    // ustatus[4] = prev. interrupt enabled */
     uptr ustatus;
     uptr uie;
     uptr utval;
     uptr uepc;
     uptr ucause;
-    /* user mtimecmp emulation */
-    u64 timecmp;
+    // user mtimecmp emulation
+    u64 deadline;
+    // exception handlers
     uptr trap_handlers[N_TRAPS];
-    /* messages */
-    Inbox inboxes[N_ZONES];
 } Zone;
 
-/* interrupt information */
+/* Interrupt handler. */
 typedef struct irq_handler {
     /* The zone handling the interrupt */
     Zone* zone;
@@ -58,46 +69,42 @@ typedef struct irq_handler {
     uptr handler;
 } IrqHandler;
 
+/* Scheduling information per-hart */
+typedef struct hart {
+    Zone* current;
+    u64 deadline;
+    Zone* next;
+    u64 next_quantum;
+    uptr event;
+    uptr state;
+} Hart;
+
+/* Kernel data */
 typedef struct kernel {
-    /* data */
+    /* Scheduler data */
+    Hart hart;
+    /* Zone data */
     Zone zones[N_ZONES];
+    /* Inboxes[receiver][sender]*/
+    Inbox inboxes[N_ZONES][N_ZONES];
     /* irq_num => handler mapping */
     IrqHandler irq_handlers[N_INTERRUPTS];
-    /* trap data */
-    uptr mcause, mtval, mie, mip;
-    /* the current running zone */
-    Zone* current;
-    /* the next zone to run */
-    Zone* next;
-    sptr next_quantum;
-    /* interrupt handling mode */
-    uptr is_isr;
 } Kernel;
 
-#define KERNEL(x) (kernel.x)
-#define CURRENT (*kernel.current)
-#define ZONES (kernel.zones)
+/* The ONLY global data */
 extern Kernel kernel;
 
-/* Kernel initialization routine */
-void KernelInit(void);
-/* Entry routine preparing for trap handling */
-void KernelEntry(void);
-/* Exit routine, starting the user process */
-void KernelExit(void);
+#define ZONES (kernel.zones)
+#define IRQ_HANDLERS (kernel.irq_handlers)
+#define INBOXES (kernel.inboxes)
+#define HART (kernel.hart)
+#define CURRENT (*kernel.hart.current)
 
-static inline void LoadNextZone(void)
-{
-    /* let next zone be current zone and set timer */
-    KERNEL(current) = KERNEL(next);
-    WriteMtimecmp(ReadMtime() + KERNEL(next_quantum));
-    /* set the next zone in round robin fashion */
-    KERNEL(next) = KERNEL(current) + 1;
-    if (KERNEL(next) == KERNEL(zones) + N_ZONES)
-        KERNEL(next) = KERNEL(zones);
-    KERNEL(next_quantum) = QUANTUM;
-    /* we are not in isr mode */
-    KERNEL(is_isr) = 0;
-}
+/* Initialize the kernel and start the first zone */
+void InitKernel(void);
+/* Trap entry point, is in assembly */
+void AsmTrapEntry(void);
+/* Load zone/user context */
+void RestoreContext(void) __attribute__((noreturn));
 
 #endif /* KERNEL_H */

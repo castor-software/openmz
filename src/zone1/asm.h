@@ -11,8 +11,8 @@
 
 #include "const.h"
 
-#define REG_S SEL(sw, sd)  // register store
-#define REG_L SEL(lw, ld)  // register load
+#define REG_S SEL(sw, sd) // register store
+#define REG_L SEL(lw, ld) // register load
 
 #define ENTRY(name) \
     .globl name;    \
