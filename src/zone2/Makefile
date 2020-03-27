@@ -17,7 +17,7 @@ OBJCOPY = riscv64-unknown-elf-objcopy
 # add flags
 ifeq ($(CC), riscv64-unknown-elf-gcc)
     CFLAGS += -std=c99 -O2 -mabi=ilp32 -march=rv32imac
-else ifeq ($(CC), ccomp)
+else ifeq ($(CC), riscv32-ccomp)
     CFLAGS += -O2 -Wall -finline-asm -fno-fpu
 endif
 

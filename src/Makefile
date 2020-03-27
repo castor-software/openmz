@@ -3,7 +3,8 @@
 PROGRAM_FOLDERS = openmz zone1 zone2
 MERGED = merged.hex
 
-CC = riscv64-unknown-elf-gcc 
+#CC = riscv64-unknown-elf-gcc 
+CC = riscv32-ccomp
 OBJCOPY = riscv64-unknown-elf-objcopy
 
 all: $(PROGRAM_FOLDERS) $(MERGED)

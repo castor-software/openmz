@@ -39,12 +39,12 @@
     [irq_num]                 \
         = { .zone = &kernel.zones[zone_id - 1], .handler = 0 },
 
-#define W 0b010
-#define RW 0b011
-#define X 0b100
-#define RX 0b101
-#define WX 0b110
-#define RWX 0b111
+#define W 2
+#define RW 3
+#define X 4
+#define RX 5
+#define WX 6
+#define RWX 7
 
 #define TOR(rwx, addr) \
     (0x8 | rwx), (addr >> 2)
