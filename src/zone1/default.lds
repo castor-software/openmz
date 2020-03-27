@@ -70,9 +70,9 @@ SECTIONS
         PROVIDE(_bss_end = ADDR(.bss) + SIZEOF(.bss)); 
 
         .stack : {
-            PROVIDE(kernel_stack_start = .);
+            PROVIDE(stack_start = .);
             . += __stack_size;
             PROVIDE(_sp = .);
-            PROVIDE(kernel_stack_end = .);
+            PROVIDE(stack_end = .);
         } >ram AT>ram :ram
 }

@@ -15,7 +15,6 @@ ENTRY(_start)
 .option norelax
     la      gp, __global_pointer$
 .option pop
-/* initialize kernel sp */
     la      sp, _sp
 
 /* relocated data segment if required */
@@ -41,12 +40,12 @@ ENTRY(_start)
     j       1b
 2:
 
-/* start the kernel */
+/* start the program */
     call    setup
 1:  call    loop      
     j       1b
 
-/* default trap vector, we reach this only if error in kernel */
+/* default trap vector, we reach this only if error in */
 __hang:
     ebreak
     j       __hang

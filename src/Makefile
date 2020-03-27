@@ -1,10 +1,18 @@
+#  
+# Copyright 2020, Saab AB
+#  
+# This software may be distributed and modified according to
+# the terms of the MIT License.
+# Note that NO WARRANTY is provided.
+# See "LICENSE.MIT" for details.
+#  
 .PHONY: all
 
 PROGRAM_FOLDERS = openmz zone1 zone2
 MERGED = merged.hex
 
 #CC = riscv64-unknown-elf-gcc 
-CC = riscv32-ccomp
+CC = ccomp
 OBJCOPY = riscv64-unknown-elf-objcopy
 
 all: $(PROGRAM_FOLDERS) $(MERGED)

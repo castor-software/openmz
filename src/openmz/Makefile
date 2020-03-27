@@ -1,9 +1,11 @@
+#  
 # Copyright 2020, Saab AB
-#
-# This software may be distributed and modified according to 
-# the terms of the GNU General Public License version 2. 
+#  
+# This software may be distributed and modified according to
+# the terms of the MIT License.
 # Note that NO WARRANTY is provided.
-# See "LICENSE.GPLv2" for details.
+# See "LICENSE.MIT" for details.
+#  
 
 PROGRAM = openmz
 ELF = $(PROGRAM).elf
@@ -18,7 +20,7 @@ BSP_DIR = ../bsp/$(TARGET)
 # include compiler specific flags
 ifeq ($(CC), riscv64-unknown-elf-gcc) # GCC
   CFLAGS += -std=c99 -Og -g -Wall -mabi=ilp32 -march=rv32imac
-else ifeq ($(CC), riscv32-ccomp) # CompCert
+else ifeq ($(CC), ccomp) # CompCert
   CFLAGS += -O -g -Wall -finline-asm -fno-fpu
 endif
 
