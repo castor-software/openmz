@@ -9,24 +9,16 @@
 #ifndef CONFIG_MACRO_H
 #define CONFIG_MACRO_H
 /* Macros used for zone configuration */
-#define XZONE(pc,                                              \
-    cfg0, addr0, cfg1, addr1, cfg2, addr2, cfg3, addr3,        \
-    cfg4, addr4, cfg5, addr5, cfg6, addr6, cfg7, addr7)        \
-    {                                                          \
-        .regs[PC] = pc,                                        \
-        .pmpcfg0 = cfg0 | cfg1 << 8 | cfg2 << 16 | cfg3 << 24, \
-        .pmpcfg1 = cfg4 | cfg5 << 8 | cfg6 << 16 | cfg7 << 24, \
-        .pmpaddr = {                                           \
-            addr0,                                             \
-            addr1,                                             \
-            addr2,                                             \
-            addr3,                                             \
-            addr4,                                             \
-            addr5,                                             \
-            addr6,                                             \
-            addr7                                              \
-        }                                                      \
-    }
+#define XZONE(pc,                                                             \
+    cfg0, addr0, cfg1, addr1, cfg2, addr2, cfg3, addr3,                       \
+    cfg4, addr4, cfg5, addr5, cfg6, addr6, cfg7, addr7)                       \
+    {                                                                         \
+        .regs[PC] = pc,                                                       \
+        .pmpcfg = {                                                           \
+            cfg0 | cfg1 << 8 | cfg2 << 16 | cfg3 << 24,                       \
+            cfg4 | cfg5 << 8 | cfg6 << 16 | cfg7 << 24 },                     \
+        .pmpaddr = { addr0, addr1, addr2, addr3, addr4, addr5, addr6, addr7 } \
+    },
 
 #define ZONE_8(pc, pmp0, pmp1, pmp2, pmp3, pmp4, pmp5, pmp6, pmp7) \
     XZONE(pc, pmp0, pmp1, pmp2, pmp3, pmp4, pmp5, pmp6, pmp7)
@@ -60,4 +52,4 @@
     (0x10 | rwx), (addr >> 2)
 #define NAPOT(rwx, addr, size) \
     (0x18 | rwx), (((addr >> 2) | ((1 << (size - 2)) - 1)) & ~(1 << (size - 2)))
-#endif /* CONFIG_MACRO_H */
+#endif // CONFIG_MACRO_H

@@ -11,6 +11,8 @@
 
 #define CSRW(reg, in) __asm__ volatile("csrw " #reg ", %0" ::"r"(in) \
                                        : "memory")
+#define CSRS(reg, in) __asm__ volatile("csrs " #reg ", %0" ::"r"(in) \
+                                       : "memory")
 #define CSRR(out, reg) __asm__ volatile("csrr %0, " #reg \
                                         : "=r"(out))
 
@@ -35,4 +37,4 @@
 #define CSRR_COUNTER(out, reg) CSRR(out, reg)
 #endif
 
-#endif /* CSR_H */
+#endif // CSR_H

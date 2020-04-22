@@ -6,40 +6,58 @@
  * Note that NO WARRANTY is provided.
  * See "LICENSE.GPLv2" for details.
  */
-#include "macro.h"
+
 .section .text.init
 .globl _start
 _start:
-    /* initialize global pointer */
-    .option push
-    .option norelax
+/* initialize global pointer */
+.option push
+.option norelax
     la      gp, __global_pointer$
-    .option pop
-    /* initialize kernel sp */
+.option pop
     la      sp, _sp
 
-    /* relocated data segment if required */
-    la      t0, _data_src_start
-    la      t1, _data_dst_start
-    la      t2, _data_dst_end
+    la		t0, hang
+    csrw	mtvec, t0
+
+// copy the ITIM section
+    la      t0, _itim_lma
+    la      t1, _itim
+    la      t2, _eitim
 
     beq     t0, t1, 2f
-1:  bge     t1, t2, 2f
-    lw      a0, 0(t0)
-    addi    t0, t0, 4 
+1:  lw      a0, 0(t0)
     sw      a0, 0(t1)
-    addi    t1, t1, 4 
-    j       1b
+    addi    t0, t0, 4
+    addi    t1, t1, 4
+    bltu    t1, t2, 1b
+2:
+	fence.i
+
+// copy the DATA section
+    la      t0, _data_lma
+    la      t1, _data
+    la      t2, _edata
+
+    beq     t0, t1, 2f
+1:  lw      a0, 0(t0)
+    sw      a0, 0(t1)
+    addi    t0, t0, 4
+    addi    t1, t1, 4
+    bltu    t1, t2, 1b
 2:
 
-    /* start the kernel */
-    csrwi   mscratch, 0     /* mscratch == 0 means kernel mode */
-    la      t0, __hang      /* set hang as default trap vector */ 
-    csrw    mtvec, t0       
-    call    KernelInit      /* call the kernel entry function */
+// zero bss segment (i.e. uninitiated data)
+    la      t1, _bss
+    la      t2, _ebss
+    beq     t1, t2, 2f
+1:  sw      x0, 0(t1)
+    addi    t1, t1, 4
+    bltu    t1, t2, 1b
+2:
 
-    /* we reach this only if error in kernel */
-__hang:
-    ebreak
-    j       __hang
-
+/* start the kernel */
+    call    kmain      
+ hang:
+ 	ebreak
+    j       hang

@@ -9,29 +9,22 @@
 #ifndef CONST_H
 #define CONST_H
 
-// XLEN is the length of a register in bits
-#define REGBITS __riscv_xlen
-// XBYTES is length of register in bytes
-#define REGBYTES (__riscv_xlen / 8)
-
-#define RV32 (__riscv_xlen == 32)
-#define RV64 (__riscv_xlen == 64)
-
 /* selection macro */
-#if RV32
+#if __riscv_xlen == 32
 #define SEL(a, b) a
 #else
 #define SEL(a, b) b
 #endif
 
+#define REG_S SEL(sw, sd) // register store
+#define REG_L SEL(lw, ld) // register load
+#define REGBYTES SEL(4, 8) // register size
+
 #define ARRAY_LEN(x) (sizeof(x) / sizeof(x[0]))
 #define UNUSED(x) x __attribute__((unused))
 
-#define XSTR(s) STR(s)
-#define STR(s) #s
-
-#define REG_S SEL(sw, sd) // register store
-#define REG_L SEL(lw, ld) // register load
+#define STR(s) XSTR(s)
+#define XSTR(s) #s
 
 // Register index
 #define PC 0
@@ -67,4 +60,4 @@
 #define T4 29
 #define T5 30
 #define T6 31
-#endif /* CONST_H */
+#endif // CONST_H

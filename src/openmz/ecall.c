@@ -7,8 +7,17 @@
  * See "LICENSE.GPLv2" for details.
  */
 
-#include "ecall.h"
-#include "timer.h"
+#include "machine.h"
+#include "sched.h"
+
+#include "const.h"
+#include "csr.h"
+#include "kernel.h"
+#include "macro.h"
+#include "traps.h"
+
+/* handler takes a caller and its argument registers a0-a7 */
+typedef void (*handler_t)(zone_t* caller, uintptr_t args[8]);
 
 /* ECALL numbers */
 #define ECALL_YIELD 0
@@ -31,169 +40,170 @@
 #define ECALL_CSRR_MIMPID 17
 #define ECALL_CSRR_MHARTID 18
 
-/* handler takes a caller and its argument registers a0-a7 */
-typedef void (*Handler)(Zone* caller, uptr args[8]);
-
-static void EcallYield(Zone UNUSED(*caller), uptr UNUSED(args[8]))
+void ecall_yield(zone_t* caller, uintptr_t args[8])
 {
-    HART.event = EVENT_YIELD;
+    KERNEL.deadline = read_mtime();
+    sched_yield();
 }
 
-static void EcallWfi(Zone* UNUSED(caller), uptr UNUSED(args[8]))
+static void ecall_send(zone_t* caller, uintptr_t args[8])
 {
-    HART.event = EVENT_WFI;
-}
-
-static void EcallSend(Zone* caller, uptr args[8])
-{
-    uptr receiver = args[0] - 1;
+    uintptr_t receiver = args[0] - 1;
     args[0] = 0;
     if (receiver >= N_ZONES)
         return;
-    Inbox* inbox = &INBOXES[receiver][caller->id - 1];
+    inbox_t* inbox = &INBOXES[receiver][caller->id - 1];
     if (inbox->full)
         return;
+    inbox->full = 1;
     for (int i = 0; i < N_MSGS; ++i)
         inbox->msgs[i] = args[1 + i];
     args[0] = 1;
 }
 
-static void EcallRecv(Zone* caller, uptr args[8])
+static void ecall_recv(zone_t* caller, uintptr_t args[8])
 {
-    uptr sender = args[0] - 1;
+    uintptr_t sender = args[0] - 1;
     args[0] = 0;
     if (sender >= N_ZONES)
         return;
-    Inbox* inbox = &INBOXES[caller->id - 1][sender];
+    inbox_t* inbox = &INBOXES[caller->id - 1][sender];
     if (!inbox->full)
         return;
+    inbox->full = 0;
     for (int i = 0; i < N_MSGS; ++i)
         args[i + 1] = inbox->msgs[i];
     args[0] = 1;
 }
 
-static void EcallTrpVect(Zone* caller, uptr args[8])
+static void ecall_trp_vect(zone_t* caller, uintptr_t args[8])
 {
-    uptr code = args[0];
-    uptr handler = args[1];
+    uintptr_t code = args[0];
+    uintptr_t handler = args[1];
     if (code >= N_TRAPS)
         return;
     caller->trap_handlers[code] = handler;
+    if (code == UMODE_SOFT_TIMER)
+        caller->deadline = 0;
 }
 
-static void EcallIrqVect(Zone* caller, uptr args[8])
+static void ecall_irq_vect(zone_t* caller, uintptr_t args[8])
 {
-    uptr code = args[0];
-    uptr handler = args[1];
-    if ((code >= N_INTERRUPTS) || (IRQ_HANDLERS[code].zone != caller))
+    uintptr_t code = args[0];
+    uintptr_t handler = args[1];
+    if ((code >= N_INTERRUPTS) || (INTRP_HANDLERS[code].zone != caller))
         return;
-    IRQ_HANDLERS[code].handler = handler;
-    if (handler)
+    INTRP_HANDLERS[code].handler = handler;
+    if (handler) {
         caller->uie |= (1 << code);
-    else
+        if (caller->ustatus & USTATUS_IE) {
+            KERNEL.mie |= (1 << code);
+        }
+    } else {
         caller->uie &= ~(1 << code);
-}
-
-static void EcallCsrsMie(Zone* caller, uptr UNUSED(args[8]))
-{
-    caller->ustatus |= USTATUS_IE;
-}
-
-static void EcallCsrcMie(Zone* caller, uptr UNUSED(args[8]))
-{
-    caller->ustatus &= ~USTATUS_IE;
-}
-
-static void EcallCsrwMtimecmp(Zone* caller, uptr args[8])
-{
-    caller->deadline = *((u64*)args);
-    if ((caller->ustatus & USTATUS_IE)
-        && caller->deadline && (caller->deadline < HART.deadline)) {
-        // zone interrupts are enabled
-        // and deadline is in current timeslice
-        SetDeadline(caller->deadline);
+        if (caller->ustatus & USTATUS_IE) {
+            KERNEL.mie &= ~(1 << code);
+        }
     }
 }
 
-static void EcallCsrrMtime(Zone* UNUSED(caller), uptr args[8])
+static void ecall_csrs_mie(zone_t* caller, uintptr_t UNUSED(args[8]))
 {
-    *((u64*)args) = GetTime();
+    caller->ustatus |= USTATUS_IE;
+    KERNEL.mie |= caller->uie;
 }
 
-static void EcallCsrrMcycle(Zone* UNUSED(caller), uptr args[8])
+static void ecall_csrc_mie(zone_t* caller, uintptr_t UNUSED(args[8]))
+{
+    caller->ustatus &= ~USTATUS_IE;
+    KERNEL.mie &= ~caller->uie;
+}
+
+static void ecall_csrw_mtimecmp(zone_t* caller, uintptr_t args[8])
+{
+    caller->deadline = *((uint64_t*)args);
+}
+
+static void ecall_csrr_mtime(zone_t* caller, uintptr_t args[8])
+{
+    *((uint64_t*)args) = read_mtime();
+}
+
+static void ecall_csrr_mcycle(zone_t* caller, uintptr_t args[8])
 {
     CSRR_COUNTER(args[0], mcycle);
 }
 
-static void EcallCsrrMinstr(Zone* UNUSED(caller), uptr args[8])
+static void ecall_csrr_minstr(zone_t* caller, uintptr_t args[8])
 {
     CSRR_COUNTER(args[0], minstret);
 }
 
-static void EcallCsrrMhpmc3(Zone* UNUSED(caller), uptr args[8])
+static void ecall_csrr_mhpmc3(zone_t* caller, uintptr_t args[8])
 {
     CSRR_COUNTER(args[0], mhpmcounter3);
 }
 
-static void EcallCsrrMhpmc4(Zone* UNUSED(caller), uptr args[8])
+static void ecall_csrr_mhpmc4(zone_t* caller, uintptr_t args[8])
 {
     CSRR_COUNTER(args[0], mhpmcounter4);
 }
 
-static void EcallCsrrMisa(Zone* UNUSED(caller), uptr args[8])
+static void ecall_csrr_misa(zone_t* caller, uintptr_t args[8])
 {
     CSRR64(args[0], misa);
 }
 
-static void EcallCsrrMvendid(Zone* UNUSED(caller), uptr args[8])
+static void ecall_csrr_mvendid(zone_t* caller, uintptr_t args[8])
 {
     CSRR64(args[0], mvendorid);
 }
 
-static void EcallCsrrMarchid(Zone* UNUSED(caller), uptr args[8])
+static void ecall_csrr_marchid(zone_t* caller, uintptr_t args[8])
 {
     CSRR64(args[0], marchid);
 }
 
-static void EcallCsrrMimpid(Zone* UNUSED(caller), uptr args[8])
+static void ecall_csrr_mimpid(zone_t* caller, uintptr_t args[8])
 {
     CSRR64(args[0], mimpid);
 }
 
-static void EcallCsrrMhartid(Zone* UNUSED(caller), uptr args[8])
+static void ecall_csrr_mhartid(zone_t* caller, uintptr_t args[8])
 {
     CSRR64(args[0], mhartid);
 }
 
-void HandleEcall(void)
+static const handler_t ecall_handlers[] = {
+    [ECALL_YIELD] = ecall_yield,
+    [ECALL_WFI] = ecall_yield,
+    [ECALL_SEND] = ecall_send,
+    [ECALL_RECV] = ecall_recv,
+    [ECALL_TRP_VECT] = ecall_trp_vect,
+    [ECALL_IRQ_VECT] = ecall_irq_vect,
+    [ECALL_CSRS_MIE] = ecall_csrs_mie,
+    [ECALL_CSRC_MIE] = ecall_csrc_mie,
+    [ECALL_CSRW_MTIMECMP] = ecall_csrw_mtimecmp,
+    [ECALL_CSRR_MTIME] = ecall_csrr_mtime,
+    [ECALL_CSRR_MCYCLE] = ecall_csrr_mcycle,
+    [ECALL_CSRR_MINSTR] = ecall_csrr_minstr,
+    [ECALL_CSRR_MHPMC3] = ecall_csrr_mhpmc3,
+    [ECALL_CSRR_MHPMC4] = ecall_csrr_mhpmc4,
+    [ECALL_CSRR_MISA] = ecall_csrr_misa,
+    [ECALL_CSRR_MVENDID] = ecall_csrr_mvendid,
+    [ECALL_CSRR_MARCHID] = ecall_csrr_marchid,
+    [ECALL_CSRR_MIMPID] = ecall_csrr_mimpid,
+    [ECALL_CSRR_MHARTID] = ecall_csrr_mhartid,
+};
+
+void handle_ecall(uintptr_t mcause, uintptr_t mtval)
 {
     /* ecall table */
-    static const Handler handlers[] = {
-        [ECALL_YIELD] = EcallYield,
-        [ECALL_WFI] = EcallWfi,
-        [ECALL_SEND] = EcallSend,
-        [ECALL_RECV] = EcallRecv,
-        [ECALL_TRP_VECT] = EcallTrpVect,
-        [ECALL_IRQ_VECT] = EcallIrqVect,
-        [ECALL_CSRS_MIE] = EcallCsrsMie,
-        [ECALL_CSRC_MIE] = EcallCsrcMie,
-        [ECALL_CSRW_MTIMECMP] = EcallCsrwMtimecmp,
-        [ECALL_CSRR_MTIME] = EcallCsrrMtime,
-        [ECALL_CSRR_MCYCLE] = EcallCsrrMcycle,
-        [ECALL_CSRR_MINSTR] = EcallCsrrMinstr,
-        [ECALL_CSRR_MHPMC3] = EcallCsrrMhpmc3,
-        [ECALL_CSRR_MHPMC4] = EcallCsrrMhpmc4,
-        [ECALL_CSRR_MISA] = EcallCsrrMisa,
-        [ECALL_CSRR_MVENDID] = EcallCsrrMvendid,
-        [ECALL_CSRR_MARCHID] = EcallCsrrMarchid,
-        [ECALL_CSRR_MIMPID] = EcallCsrrMimpid,
-        [ECALL_CSRR_MHARTID] = EcallCsrrMhartid,
-    };
 
-    Zone* caller = &CURRENT;
+    zone_t* caller = &CURRENT;
     /* always advance PC! */
     caller->regs[PC] += 4;
-    uptr ecall = caller->regs[A7];
-    if (ecall < ARRAY_LEN(handlers))
-        handlers[ecall](caller, caller->regs + A0);
+    uintptr_t ecall = caller->regs[A7];
+    if (ecall < ARRAY_LEN(ecall_handlers))
+        ecall_handlers[ecall](caller, caller->regs + A0);
 }

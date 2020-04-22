@@ -6,9 +6,13 @@
  * Note that NO WARRANTY is provided.
  * See "LICENSE.GPLv2" for details.
  */
-flash = 0x20010000;
-ram  = 0x80000000;
-mtime = 0x200bff8;
-mtimecmp = 0x2004000;
-mtimeh = mtime + 4;
-mtimecmph = mtimecmp + 4;
+rom = 0x20000000;
+ram = 0x80000000;
+itim = 0x8000000;
+
+CLIC  = 0x02000000;
+PLIC  = 0x0C000000;
+PRCI  = 0x10008000;
+GPIO  = 0x10012000;
+UART0 = 0x10013000;
+UART1 = 0x10023000;

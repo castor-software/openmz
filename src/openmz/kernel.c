@@ -7,44 +7,34 @@
  * See "LICENSE.GPLv2" for details.
  */
 #include "kernel.h"
-#include "scheduler.h"
-#include "timer.h"
 
-Kernel kernel = { .zones = ZONE_CONFIG, .irq_handlers = IRQ_CONFIG };
+#include "machine.h"
+#include "sched.h"
 
-extern void AsmRestoreContext(uptr regs[32]) __attribute__((noreturn));
-void RestoreContext(void)
+#include "csr.h"
+
+kernel_t kernel = { .zones = { ZONE_CONFIG }, .intrp_handlers = { IRQ_CONFIG } };
+
+extern void asm_restore_context(uintptr_t[32], uint32_t[2], uintptr_t[8]) __attribute__((noreturn));
+void restore_context(void)
 {
-    // Here we should clear cache.
-    Zone* zone = HART.current;
-#if REGBITS == 32
-    CSRW(pmpcfg0, zone->pmpcfg0);
-    CSRW(pmpcfg1, zone->pmpcfg1);
-#else
-    CSRW(pmpcfg0, (u64)(zone->pmpcfg1 << 32) | zone->pmpcfg0);
-#endif
-    CSRW(pmpaddr0, zone->pmpaddr[0]);
-    CSRW(pmpaddr1, zone->pmpaddr[1]);
-    CSRW(pmpaddr2, zone->pmpaddr[2]);
-    CSRW(pmpaddr3, zone->pmpaddr[3]);
-    CSRW(pmpaddr4, zone->pmpaddr[4]);
-    CSRW(pmpaddr5, zone->pmpaddr[5]);
-    CSRW(pmpaddr6, zone->pmpaddr[6]);
-    CSRW(pmpaddr7, zone->pmpaddr[7]);
-    AsmRestoreContext(zone->regs);
+    clear_cache();
+    asm_restore_context(CURRENT.regs, CURRENT.pmpcfg, CURRENT.pmpaddr);
 }
 
-void KernelInit(void)
+extern void asm_trap_entry(void) __attribute__((noreturn));
+void kmain(void)
 {
     // Kernel csr initialization.
-    CSRW(mtvec, AsmTrapEntry);
+    CSRW(mtvec, asm_trap_entry);
     CSRW(mstatus, 0);
-    CSRW(mcounteren, 0xF);
     // set the zones' id
     for (int i = 0; i < N_ZONES; ++i)
         ZONES[i].id = i + 1;
+    // initilize the hardware
+    init_hardware();
     // initialize the scheduler
-    InitScheduler();
+    sched_init();
     // Start zone context
-    RestoreContext();
+    restore_context();
 }

@@ -7,37 +7,23 @@
 # See "LICENSE.MIT" for details.
 #  
 
-PROGRAM = openmz
-ELF = $(PROGRAM).elf
-HEX = $(PROGRAM).hex
-SOURCES = head.S traps.S ecall.c illegal_instruction.c kernel.c scheduler.c traps.c user_timer.c user_trap.c 
+INCLUDES = include $(BSP_DIR)
 
+SOURCES = $(wildcard *.c *.S)
+HEADERS = $(wildcard *.h $(addsuffix /*.h, $(INCLUDES)))
 
-SIZE = riscv64-unknown-elf-size
-OBJCOPY = riscv64-unknown-elf-objcopy
-BSP_DIR = ../bsp/$(TARGET)
+#CC = ccomp
+#CFLAGS = -finline-asm -fno-fpu -g
 
-# include compiler specific flags
-ifeq ($(CC), riscv64-unknown-elf-gcc) # GCC
-  CFLAGS += -std=c99 -Og -g -Wall -mabi=ilp32 -march=rv32imac
-else ifeq ($(CC), ccomp) # CompCert
-  CFLAGS += -O -g -Wall -finline-asm -fno-fpu
-endif
+CFLAGS = -march=$(ARCH) -mabi=$(ABI) -mcmodel=$(CMODEL)
+CFLAGS += -g -O2
 
+CFLAGS += $(addprefix -I, $(INCLUDES)) -nostdlib -static
+CFLAGS += -T $(BSP_DIR)/memory.lds -T default.lds
 
+.PHONY: compile 
+compile: $(PROGRAM_ELF)
 
-# load the memory layout from the BSP (memory.lds), and the linker script (default.lds).
-CFLAGS += -T $(BSP_DIR)/memory.lds -T default.lds -nostdlib
-
-all: $(ELF) $(HEX)
-
-$(ELF): $(wildcard *.S *.h *.c)
-	$(CC) $(CFLAGS) $(SOURCES) -o $(ELF)
-	$(SIZE) $(ELF)
-
-$(HEX): $(ELF)
-	$(OBJCOPY) -O ihex $(ELF) $(HEX)
-
-.PHONY: clean
-clean:
-	rm -f $(ELF) $(HEX)
+$(PROGRAM_ELF): $(SOURCES) $(HEADERS)
+	$(CC) $(CFLAGS) -o $@ $(SOURCES) 
+	$(SIZE) $@

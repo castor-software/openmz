@@ -12,51 +12,42 @@ ENTRY(_start)
 
 MEMORY
 {
-        flash (rxai!w) : ORIGIN = flash + 0x20000, LENGTH = 0x10000
+        /* 64 KiB rom */
+        rom (rxai!w) : ORIGIN = rom + 0x200000, LENGTH = 0x100000
+        /* 6 KiB ram */
         ram (wxa!ri) : ORIGIN = ram + 0x2000, LENGTH = 0x1000 
-}
-
-PHDRS
-{
-        flash PT_LOAD; 
-        ram PT_LOAD; 
-        ram_init PT_LOAD; 
 }
 
 SECTIONS
 {
+        /* 1 KiB stack */
         __stack_size = DEFINED(__stack_size) ? __stack_size : 0x400;
         PROVIDE(__stack_size = __stack_size);
+
         .text : {
                 KEEP(*(.text.init))
-                KEEP(*(.text.trap))
                 *(.text)
                 *(.text.*)
-                . = ALIGN(4); 
-        } >flash AT>flash :flash
+                . = ALIGN(8); 
+        } >rom AT>rom
 
-        PROVIDE(_text_start = ADDR(.text)); 
-        PROVIDE(_text_end = ADDR(.text) + SIZEOF(.text)); 
-  
         .rodata : ALIGN(8) {
                 *(.rdata)
                 *(.rodata)
                 *(.rodata.*)
-        } >flash AT>flash :flash
+        } >rom AT>rom
 
         .data : ALIGN(8) {
                 *(.data)
                 *(.data.*)
-                . = ALIGN(4); 
-                PROVIDE(__global_pointer$ = . + 0x800); 
                 *(.sdata)
                 *(.sdata.*)
-                . = ALIGN(4); 
-        } >ram AT>flash :ram_init
-
-        PROVIDE(_data_src_start = LOADADDR(.data)); 
-        PROVIDE(_data_dst_start = ADDR(.data)); 
-        PROVIDE(_data_dst_end = ADDR(.data) + SIZEOF(.data)); 
+                . = ALIGN(8); 
+        } >ram AT>rom
+        PROVIDE(_data_lma = LOADADDR(.data)); 
+        PROVIDE(_data = ADDR(.data)); 
+        PROVIDE(_edata = ADDR(.data) + SIZEOF(.data)); 
+        PROVIDE(__global_pointer$ = ADDR(.data) + 0x800); 
 
         .bss : ALIGN(8) {
                 *(.bss)
@@ -64,15 +55,14 @@ SECTIONS
                 *(.sbss*)
                 *(COMMON)
                 . = ALIGN(8); 
-        } >ram AT>ram :ram
+        } >ram AT>ram
+        PROVIDE(_bss = ADDR(.bss)); 
+        PROVIDE(_ebss = ADDR(.bss) + SIZEOF(.bss)); 
+        PROVIDE(_heap = _ebss); 
 
-        PROVIDE(_bss_start = ADDR(.bss)); 
-        PROVIDE(_bss_end = ADDR(.bss) + SIZEOF(.bss)); 
-
-        .stack : {
-            PROVIDE(stack_start = .);
+        .stack ORIGIN(ram) + LENGTH(ram) - __stack_size : {
             . += __stack_size;
-            PROVIDE(_sp = .);
-            PROVIDE(stack_end = .);
-        } >ram AT>ram :ram
+        } >ram AT>ram
+        PROVIDE(_eheap = ADDR(.stack));
+        PROVIDE(_sp = ADDR(.stack) + SIZEOF(.stack));
 }

@@ -6,10 +6,10 @@
  * Note that NO WARRANTY is provided.
  * See "LICENSE.GPLv2" for details.
  */
-#include "asm.h"
 
 .section .text.init
-ENTRY(_start)
+.globl _start
+_start:
 /* initialize global pointer */
 .option push
 .option norelax
@@ -18,34 +18,30 @@ ENTRY(_start)
     la      sp, _sp
 
 /* relocated data segment if required */
-    la      t0, _data_src_start
-    la      t1, _data_dst_start
-    la      t2, _data_dst_end
+    la      t0, _data_lma
+    la      t1, _data
+    la      t2, _edata
 
     beq     t0, t1, 2f
-1:  bge     t1, t2, 2f
-    REG_L   a0, 0(t0)
-    addi    t0, t0, XBYTES
-    REG_S   a0, 0(t1)
-    addi    t1, t1, XBYTES
-    j       1b
+1:  lw      a0, 0(t0)
+    sw      a0, 0(t1)
+    addi    t0, t0, 4
+    addi    t1, t1, 4
+    bltu    t1, t2, 1b
 2:
 
-/* zero bss segment (i.e. uninitiated data) */
-    la      t0, _bss_start
-    la      t1, _bss_end
-1:  bge     t0, t1, 2f
-    REG_S   x0, 0(t0)
-    addi    t0, t0, 4
-    j       1b
+// zero bss segment (i.e. uninitiated data)
+    la      t1, _bss
+    la      t2, _ebss
+    beq     t1, t2, 2f
+1:  sw      x0, 0(t1)
+    addi    t1, t1, 4
+    bltu    t1, t2, 1b
 2:
 
 /* start the program */
-    call    setup
-1:  call    loop      
-    j       1b
-
-/* default trap vector, we reach this only if error in */
-__hang:
-    ebreak
-    j       __hang
+    mv      a0, x0
+    mv      a1, x0
+    call    main      
+ hang:
+    j       hang
