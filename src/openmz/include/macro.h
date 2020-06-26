@@ -12,20 +12,21 @@
 /* selection macro */
 #if __riscv_xlen == 32
 #define SEL(a, b) a
-#define RV32 1
 #else
-#define RV64 1
 #define SEL(a, b) b
 #endif
 
-#define XLEN SEL(32, 64)
-#define XBYTES SEL(4, 8)
-
-#define CAST64(x) (*(u64*)(&x))
+#define REG_S SEL(sw, sd) // register store
+#define REG_L SEL(lw, ld) // register load
+#define REGBYTES SEL(4, 8) // register size
 
 #define ARRAY_LEN(x) (sizeof(x) / sizeof(x[0]))
+#define UNUSED(x) x __attribute__((unused))
 
-/* Register index */
+#define STR(s) XSTR(s)
+#define XSTR(s) #s
+
+// Register index
 #define PC 0
 #define RA 1
 #define SP 2
@@ -59,5 +60,4 @@
 #define T4 29
 #define T5 30
 #define T6 31
-
-#endif /* CONST_H */
+#endif // CONST_H

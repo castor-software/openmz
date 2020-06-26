@@ -14,6 +14,9 @@ OpenMZ is a security kernel for RISC-V processors with machine-mode and user-mod
 - Fast register-based inter-zone communication.
 
 ## Attacker model
+- **Data attack.** A zone tries to access or modify the memory in an unauthorized manner.
+- **Timing attack.** A zone tries to infer information from another zone or the kernel using timing side-channel attacks.
+- **Cache attack.** A zone tries to infer information from another zone or the kernel using cache side-channel attacks.
 
 ## Kernel configuration
 The kernel's configurations is in [config.h](openmz/config.h). The PMP fields `pmpcfg0` and `pmpaddr[0-8]` are configured as in RISC-V's PMP registers `pmpcfg0` and `pmpaddr0-7`. The initial program counter is stored in `regs[0]`. Interrupt mappings are stored in the `irq_handlers` field. All of these configurations options are set in `config.h`.
@@ -47,7 +50,6 @@ The kernel's configurations is in [config.h](openmz/config.h). The PMP fields `p
 ## (Potential) Future Work
 - Complete formal verification - from the hardware level to source code.
 - Implement `ECALL_WFI`.
-- Asynchronous user-mode timer interrupts.
 - `YIELD_TO` call - allowing zones to yield their remaining time slice to a specific zone.
 - An optional *temporal* isolation of zones by disabling `YIELD/WFI` calls, and immediate context switch for interrupts.
 - More advanced round-robin scheduling with more configurable zone order and time slices.
