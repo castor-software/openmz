@@ -1,10 +1,11 @@
-/*
- * const.h
+/**
+ * Copyright 2020, Saab AB
  *
- *  Created on: Apr 4, 2020
- *      Author: hak
+ * This software may be distributed and modified according to
+ * the terms of the GNU General Public License version 2.
+ * Note that NO WARRANTY is provided.
+ * See "LICENSE.GPLv2" for details.  
  */
-
 #ifndef CONST_H_
 #define CONST_H_
 
